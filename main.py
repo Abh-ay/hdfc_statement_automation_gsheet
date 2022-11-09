@@ -17,7 +17,7 @@ from selenium.common import NoSuchElementException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.common.by import By
-from webdriver_manager.chrome import ChromeDriverManager
+# from webdriver_manager.chrome import ChromeDriverManager
 
 
 
@@ -65,17 +65,11 @@ def init_webdriver():
 
 
 def navigate_to_login_page():
-    """
-    Navigate to HDFC Net banking Login Page
-    """
     driver.get("https://netbanking.hdfcbank.com/netbanking/")
     driver.implicitly_wait(0.5)
 
 
 def login():
-    """
-    Find the login inputs. Fill them with username and password from .env file. Click LOGIN button.
-    """
     driver.switch_to.frame("login_page")
     customer_id = driver.find_element(by=By.NAME, value='fldLoginUserId')
     CUSTOMER_ID = os.getenv('CUSTOMER_ID')
@@ -96,12 +90,8 @@ def login():
     login_btn.click()
 
 
+# SELECT A/c Statement Current & Previous month from Enquire tab. 
 def get_current_month_account_statement():
-    """
-    Get Current & Previous Month Account Statement.
-    Keep the Statement Period from FROM_DATE to TO_DATE.
-    Select CSV Download.
-    """
     driver.implicitly_wait(0.5)
     driver.switch_to.frame("left_menu")
     enquire_btn = driver.find_element(by=By.XPATH, value='//*[@id="enquiryatag"]')
@@ -127,10 +117,7 @@ def get_current_month_account_statement():
     view_btn.click()
 
 
-def download_csv():
-    """
-    Download Account Statement CSV File
-    """
+def download_file():
     delimited_file_format = None
     try:
         delimited_file_format = driver.find_element(by=By.CSS_SELECTOR,
@@ -147,16 +134,12 @@ def download_csv():
 
 
 def parse_transactions():
-    """
-    Parse transactions from CSV file according to custom format.
-    :return: list of parsed transactions
-    """
-    csv_transactions = []
+    file_transactions = []
     path = os.getenv('TRANSACTIONS_FILE_PATH')
     for filename in glob.glob(os.path.join(path, '*.txt')):
         with open(os.path.join(os.getcwd(), filename), 'r') as csv_file:  # open in readonly mode
             temp=["Date","Title","Debit amount","Credit amount","Transaction ID","Closing Balance"]
-            csv_transactions.append(temp)
+            file_transactions.append(temp)
             try:
                 reader = csv.reader(csv_file)
                 next(reader)  # skip empty row
@@ -169,36 +152,30 @@ def parse_transactions():
                     Custom parsing of transactions according to desired format.
                     """
                     transaction = [row[0],row[1],row[3],row[4],row[5],row[6]]
-                    csv_transactions.append(transaction)
+                    file_transactions.append(transaction)
                     # print("++++")
                     # print(transaction)
-                if len(csv_transactions) == 0:
+                if len(file_transactions) == 0:
                     print('No transactions found')
                     exit(0)
             except Exception as e:
                 print("---")
                 print(e)
-    return csv_transactions
+    return file_transactions
 
 
 def update_sheet(parsed_transactions):
-    """
-    Populate cells in Google Sheet in desired range and desired columns.
-    This function is tailored according to my Google Sheets setup.
-
-    :param parsed_transactions: list of custom parsed transactions from HDFC
-    """
-
-    # If modifying these scopes, delete the file token.json.
     SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
     # The ID and range of a sample spreadsheet.
     SPREADSHEET_ID = os.getenv('SPREADSHEET_ID')
     READ_RANGE_NAME = f'A6:A{int(os.getenv("MAX_ROWS"))}'
     CREDENTIAL_FILE=os.getenv('CREDENTIAL_PATH')
     creds = None
-    # The file token.json stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first
-    # time.
+    """
+     The file token.json stores the user's access and refresh tokens, and is
+     created automatically when the authorization flow completes for the first
+     time.
+    """
     if os.path.exists('token.json'):
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
     # If there are no (valid) credentials available, let the user log in.
@@ -251,12 +228,8 @@ def remove_transactions_file():
         os.remove(f)
 
 
+# This func is for update FROM_DATE to today's date, when process is completes succesfully.
 def update_last_run_time():
-    """
-    Update LAST_RUN value in .env file.
-    The next time we run this script without providing any arguments,
-    the script automatically fetches transactions from last run date to today.
-    """
     os.environ["LAST_RUN"] = datetime.datetime.today().strftime('%d/%m/%Y')
     dotenv.set_key(dotenv_file, "LAST_RUN", os.environ["LAST_RUN"])
 
@@ -274,7 +247,7 @@ login()
 print(f"Fetching transactions from {FROM_DATE} to {TO_DATE}")
 get_current_month_account_statement()
 driver.implicitly_wait(4)
-download_csv()
+download_file()
 time.sleep(2.5)
 driver.quit()
 print("Parsing Transactions according to custom format")
@@ -285,4 +258,4 @@ print("Removing transactions file")
 remove_transactions_file()
 print("Updating Last Run Time for script. Will fetch transactions from today the next time.")
 update_last_run_time()
-print("Peace :)")
+print("Congrats, You have updated sheets according to your account transaction successfully.....")
